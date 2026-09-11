@@ -8,41 +8,133 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Dosyaları Oluştur
-        run: |
-          mkdir -p app/src/main/java/com/ornek/sayac
-          mkdir -p app/src/main/res/layout
-          mkdir -p app/src/main/res/values
-
-          echo "rootProject.name = \"SayacApp\"" > settings.gradle
-          echo "include ':app'" >> settings.gradle
-
-          echo "plugins { id 'com.android.application' version '8.1.4' apply false }" > build.gradle
-          echo "plugins { id 'org.jetbrains.kotlin.android' version '1.9.10' apply false }" >> build.gradle
-
-          echo "android.useAndroidX=true" > gradle.properties
-
-          echo "plugins { id 'com.android.application'; id 'org.jetbrains.kotlin.android' }" > app/build.gradle
-          echo "android { namespace 'com.ornek.sayac'; compileSdk 34; defaultConfig { applicationId 'com.ornek.sayac'; minSdk 21; targetSdk 34; versionCode 1; versionName '1.0' } }" >> app/build.gradle
-          echo "dependencies { implementation 'androidx.appcompat:appcompat:1.6.1' }" >> app/build.gradle
-
-          echo '<?xml version="1.0" encoding="utf-8"?><manifest xmlns:android="http://schemas.android.com/apk/res/android"><application android:label="Sayaç" android:theme="@style/Theme.AppCompat.DayNight"><activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter></activity></application></manifest>' > app/src/main/AndroidManifest.xml
-
-          echo 'package com.ornek.sayac; import android.os.Bundle; import android.widget.Button; import android.widget.TextView; import androidx.appcompat.app.AppCompatActivity; public class MainActivity extends AppCompatActivity { private int sayi = 0; @Override protected void onCreate(Bundle savedInstanceState) { super.onCreate(savedInstanceState); setContentView(R.layout.activity_main); TextView text = findViewById(R.id.sayiText); findViewById(R.id.artirBtn).setOnClickListener(v -> { sayi++; text.setText(String.valueOf(sayi)); }); findViewById(R.id.azaltBtn).setOnClickListener(v -> { sayi--; text.setText(String.valueOf(sayi)); }); findViewById(R.id.sifirlaBtn).setOnClickListener(v -> { sayi = 0; text.setText(String.valueOf(sayi)); }); } }' > app/src/main/java/com/ornek/sayac/MainActivity.java
-
-          echo '<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:gravity="center" android:padding="24dp"><TextView android:id="@+id/sayiText" android:text="0" android:textSize="72sp" android:layout_width="wrap_content" android:layout_height="wrap_content"/><Button android:id="@+id/artirBtn" android:text="+ Artır" android:layout_width="match_parent" android:layout_height="wrap_content"/><Button android:id="@+id/azaltBtn" android:text="- Azalt" android:layout_width="match_parent" android:layout_height="wrap_content"/><Button android:id="@+id/sifirlaBtn" android:text="Sıfırla" android:layout_width="match_parent" android:layout_height="wrap_content"/></LinearLayout>' > app/src/main/res/layout/activity_main.xml
-
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Build APK
+      - name: Android SDK Kurulumu
         run: |
-          gradle wrapper --gradle-version 8.4
-          ./gradlew assembleDebug --no-daemon
+          yes | sdkmanager --licenses || true
+          sdkmanager "platforms;android-34" "build-tools;34.0.0" || true
 
-      - name: Upload APK
+      - name: Proje Dosyalarını Oluştur
+        run: |
+          mkdir -p app/src/main/java/com/ornek/sayac
+          mkdir -p app/src/main/res/layout
+          mkdir -p app/src/main/res/values
+
+          cat > settings.gradle << 'EOF'
+          pluginManagement {
+              repositories { google(); mavenCentral(); gradlePluginPortal() }
+          }
+          dependencyResolutionManagement {
+              repositories { google(); mavenCentral() }
+          }
+          rootProject.name = "SayacApp"
+          include ':app'
+          EOF
+
+          cat > build.gradle << 'EOF'
+          plugins {
+              id 'com.android.application' version '8.1.4' apply false
+              id 'org.jetbrains.kotlin.android' version '1.9.10' apply false
+          }
+          EOF
+
+          cat > gradle.properties << 'EOF'
+          android.useAndroidX=true
+          org.gradle.jvmargs=-Xmx2048m
+          EOF
+
+          cat > app/build.gradle << 'EOF'
+          plugins {
+              id 'com.android.application'
+              id 'org.jetbrains.kotlin.android'
+          }
+          android {
+              namespace 'com.ornek.sayac'
+              compileSdk 34
+              defaultConfig {
+                  applicationId "com.ornek.sayac"
+                  minSdk 21
+                  targetSdk 34
+                  versionCode 1
+                  versionName "1.0"
+              }
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_1_8
+                  targetCompatibility JavaVersion.VERSION_1_8
+              }
+              kotlinOptions { jvmTarget = '1.8' }
+          }
+          dependencies {
+              implementation 'androidx.appcompat:appcompat:1.6.1'
+              implementation 'com.google.android.material:material:1.11.0'
+          }
+          EOF
+
+          cat > app/src/main/AndroidManifest.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <application android:label="Sayaç" android:theme="@style/Theme.AppCompat.DayNight">
+                  <activity android:name=".MainActivity" android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
+
+          cat > app/src/main/java/com/ornek/sayac/MainActivity.kt << 'EOF'
+          package com.ornek.sayac
+          import android.os.Bundle
+          import android.widget.Button
+          import android.widget.TextView
+          import androidx.appcompat.app.AppCompatActivity
+          class MainActivity : AppCompatActivity() {
+              private var sayi = 0
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+                  setContentView(R.layout.activity_main)
+                  val text = findViewById<TextView>(R.id.sayiText)
+                  findViewById<Button>(R.id.artirBtn).setOnClickListener { sayi++; text.text = sayi.toString() }
+                  findViewById<Button>(R.id.azaltBtn).setOnClickListener { sayi--; text.text = sayi.toString() }
+                  findViewById<Button>(R.id.sifirlaBtn).setOnClickListener { sayi = 0; text.text = sayi.toString() }
+              }
+          }
+          EOF
+
+          cat > app/src/main/res/layout/activity_main.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent" android:layout_height="match_parent"
+              android:orientation="vertical" android:gravity="center" android:padding="24dp">
+              <TextView android:id="@+id/sayiText" android:text="0" android:textSize="72sp"
+                  android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+              <Button android:id="@+id/artirBtn" android:text="+ Artır" android:layout_width="match_parent"
+                  android:layout_height="wrap_content" android:layout_marginTop="24dp"/>
+              <Button android:id="@+id/azaltBtn" android:text="- Azalt" android:layout_width="match_parent"
+                  android:layout_height="wrap_content"/>
+              <Button android:id="@+id/sifirlaBtn" android:text="Sıfırla" android:layout_width="match_parent"
+                  android:layout_height="wrap_content"/>
+          </LinearLayout>
+          EOF
+
+          cat > app/src/main/res/values/strings.xml << 'EOF'
+          <resources><string name="app_name">Sayaç</string></resources>
+          EOF
+
+      - name: Gradle Kurulumu ve Derleme
+        run: |
+          wget -q https://services.gradle.org/distributions/gradle-8.4-bin.zip
+          unzip -q -d /opt gradle-8.4-bin.zip
+          export PATH=$PATH:/opt/gradle-8.4/bin
+          gradle assembleDebug --no-daemon
+
+      - name: APK'yı Yükle
         uses: actions/upload-artifact@v4
         with:
           name: sayac-apk
